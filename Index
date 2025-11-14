@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>領収書登録アプリ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      -webkit-text-size-adjust: 100%; /* iOSでの文字サイズ自動調整を無効化 */
+    }
+    .container {
+      max-width: 1200px; /* プレビュー表示のため幅を広げる */
+    }
+    .card {
+      border: none;
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    .loader {
+      display: none;
+    }
+    .table-responsive {
+      max-height: 60vh;
+    }
+    .nav-tabs .nav-link {
+      cursor: pointer;
+    }
+    .filter-area {
+      background-color: #e9ecef;
+      padding: 1rem;
+      border-radius: 0.25rem;
+    }
+    .amount-input {
+      text-align: right;
+    }
+    #alert-container {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1050;
+      min-width: 250px;
+    }
+    
+    #file-preview-container {
+      height: 600px;
+      background-color: #e9ecef;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+    }
+    #file-preview-container img,
+    #file-preview-container iframe {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+    }
+     #file-preview-container iframe {
+       width: 100%;
+       height: 100%;
+       border: none;
+    }
+    
+    #upload-section {
+      max-width: 550px;
+      margin: 4rem auto;
+    }
+
+    .detail-row {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+    }
+
+    /* スマホでの視認性と操作性を高めるためのスタイル */
+    .form-control, .form-select {
+        min-height: calc(1.5em + 1rem + 2px);
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+    }
+    .table .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: .875rem;
+    }
+    .filter-area .form-control, .filter-area .form-select {
+        min-height: auto;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+      .filter-area .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    /* 中サイズデバイス (タブレットなど) 以下のためのスタイル */
+    @media (max-width: 991.98px) {
+        html {
+            font-size: 16px;
+        }
+        body {
+            font-size: 1rem;
+        }
+        .container {
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+         .card-body {
+            padding: 1rem;
+        }
+        h3 {
+            font-size: 1.3rem;
+        }
+        h5 {
+            font-size: 1.2rem;
+        }
+         .form-label {
+            font-size: 1rem;
+            font-weight: 500; /* 少し太くして視認性アップ */
+            margin-bottom: 0.3rem;
+        }
+        .form-control, .form-select, .btn {
+            font-size: 1.05rem; /* 入力文字も少し大きく */
+            padding-top: 0.8rem; /* 高さを出してタップしやすく */
+            padding-bottom: 0.8rem;
+        }
+        #file-preview-container {
+          height: 300px;
+          margin-bottom: 1.5rem; /* フォームとの間隔を確保 */
+        }
+        .table th, .table td {
+            padding: 0.75rem 0.5rem; /* テーブルの行間を広げる */
+            vertical-align: middle;
+        }
+         .table .btn {
+            display: block;
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+        }
+        /* 履歴タブのボタンも少し大きく */
+        .table .btn-sm {
+           padding: 0.5rem;
+           font-size: 0.9rem;
+        }
+        #upload-section {
+          margin: 1rem auto;
+        }
+    }
+  </style>
+</head>
+<body>
+  <div class="container my-4">
+    <div class="card">
+      <div class="card-header">
+          <h3 class="text-center my-2">領収書登録アプリ</h3>
+        <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-tab-pane" type="button" role="tab" aria-controls="upload-tab-pane" aria-selected="true">アップロード</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-tab-pane" type="button" role="tab" aria-controls="history-tab-pane" aria-selected="false">登録履歴</button>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card-body">
+        <div class="tab-content" id="myTabContent">
+          <!-- Upload Tab -->
+          <div class="tab-pane fade show active p-3" id="upload-tab-pane" role="tabpanel" aria-labelledby="upload-tab" tabindex="0">
+            
+            <div id="upload-section">
+                <form id="uploadForm">
+                  <div class="mb-3">
+                    <label for="imageFile" class="form-label">領収書を撮影または選択 (画像/PDF)</label>
+                    <input class="form-control" type="file" id="imageFile" accept="image/*,application/pdf" required>
+                  </div>
+                  <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary" id="submitButton">
+                      <span class="spinner-border spinner-border-sm loader" role="status" aria-hidden="true" id="spinner"></span>
+                      アップロードして解析
+                    </button>
+                  </div>
+                </form>
+            </div>
+
+            <div id="edit-section" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5>AI解析結果の確認・修正</h5>
+                    <h6 id="receipt-counter" class="text-end fw-bold text-primary" style="display: none;"></h6>
+                </div>
+                <div class="row">
+                    <!-- Preview Column -->
+                    <div class="col-12 col-lg-6">
+                        <div id="file-preview-container" class="border rounded p-1 mb-3 mb-lg-0">
+                            <span class="text-muted">ファイルプレビュー</span>
+                        </div>
+                    </div>
+                    <!-- Form Column -->
+                    <div class="col-12 col-lg-6">
+                      <form id="receiptForm">
+                        <input type="hidden" id="receiptId">
+                        
+                        <!-- Parent Form -->
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="useDate" class="form-label">利用日</label>
+                                <input type="date" class="form-control" id="useDate" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="user" class="form-label">使用者</label>
+                                <select class="form-select" id="user" required></select>
+                            </div>
+                            <div class="col-12">
+                                <label for="storeName" class="form-label">支払先</label>
+                                <input type="text" class="form-control" id="storeName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="totalAmount" class="form-label">合計金額</label>
+                                <input type="number" class="form-control amount-input" id="totalAmount" placeholder="0" required readonly>
+                            </div>
+                             <div class="col-12">
+                                <label for="memo" class="form-label">メモ（領収書全体）</label>
+                                <textarea class="form-control" id="memo" rows="2"></textarea>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Details Section -->
+                        <h6>明細</h6>
+                        <div id="details-container">
+                          <!-- Detail rows will be inserted here by JavaScript -->
+                        </div>
+                        <div class="d-grid mt-3">
+                            <button type="button" class="btn btn-outline-success" id="add-detail-btn">
+                                <i class="bi bi-plus-circle-fill me-2"></i>明細を追加
+                            </button>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                          <button type="button" class="btn btn-secondary me-md-2" id="cancelButton">キャンセル</button>
+                          <button type="submit" class="btn btn-primary" id="saveButton">登録</button>
+                        </div>
+                      </form>
+                    </div>
+                </div>
+            </div>
+
+          </div>
+
+          <!-- History Tab -->
+          <div class="tab-pane fade p-3" id="history-tab-pane" role="tabpanel" aria-labelledby="history-tab" tabindex="0">
+            <h5>登録履歴</h5>
+            <div class="filter-area mb-3">
+              <div class="row g-2 align-items-end">
+                <div class="col-md">
+                  <label for="filterStartDate" class="form-label">開始日</label>
+                  <input type="date" class="form-control" id="filterStartDate">
+                </div>
+                <div class="col-md">
+                  <label for="filterEndDate" class="form-label">終了日</label>
+                  <input type="date" class="form-control" id="filterEndDate">
+                </div>
+                <div class="col-md">
+                  <label for="filterStoreName" class="form-label">支払先</label>
+                  <input type="text" class="form-control" id="filterStoreName" placeholder="部分一致">
+                </div>
+                <div class="col-md-auto">
+                  <button class="btn btn-sm btn-primary w-100" id="filterButton">絞り込み</button>
+                </div>
+                 <div class="col-md-auto">
+                  <button class="btn btn-sm btn-outline-secondary w-100" id="clearFilterButton">クリア</button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="d-flex justify-content-end mb-2">
+              <button class="btn btn-sm btn-success" id="downloadCsvButton">CSVダウンロード</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-striped table-hover table-sm">
+                <thead>
+                  <tr>
+                    <th>操作</th>
+                    <th>利用日</th>
+                    <th>使用者</th>
+                    <th>支払先</th>
+                    <th>合計金額</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Container -->
+  <div id="alert-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      showAlert(`予期せぬエラーが発生しました: ${message}`, 'danger');
+      console.error("Unhandled error:", message, source, lineno, colno, error);
+      setLoading(false); 
+      const saveButton = document.getElementById('saveButton');
+      if(saveButton) saveButton.disabled = false;
+      return true;
+    };
+
+    // --- Global State ---
+    let localPreviewUrl = null;
+    let userOptions = '';
+    let categoryOptions = '';
+    let multiReceiptQueue = [];
+
+
+    // --- Elements ---
+    const uploadForm = document.getElementById('uploadForm');
+    const receiptForm = document.getElementById('receiptForm');
+    const fileInput = document.getElementById('imageFile');
+    const submitButton = document.getElementById('submitButton');
+    const saveButton = document.getElementById('saveButton');
+    const spinner = document.getElementById('spinner');
+    const historyTableBody = document.getElementById('historyTableBody');
+    const historyTab = new bootstrap.Tab(document.getElementById('history-tab'));
+    const detailsContainer = document.getElementById('details-container');
+    
+    // Sections
+    const uploadSection = document.getElementById('upload-section');
+    const editSection = document.getElementById('edit-section');
+
+    // Filter Elements
+    const filterButton = document.getElementById('filterButton');
+    const clearFilterButton = document.getElementById('clearFilterButton');
+    const filterStartDate = document.getElementById('filterStartDate');
+    const filterEndDate = document.getElementById('filterEndDate');
+    const filterStoreName = document.getElementById('filterStoreName');
+
+    // --- On Load ---
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        fetchHistory();
+        google.script.run.withSuccessHandler(populateUserDropdown).getUsers();
+        google.script.run.withSuccessHandler(populateCategoryDropdown).getCategories();
+      } catch(e) {
+        showAlert('アプリの初期化中にエラーが発生しました: ' + e.message, 'danger');
+        console.error('DOMContentLoaded error:', e);
+      }
+    });
+
+    // --- Event Listeners ---
+    uploadForm.addEventListener('submit', handleUploadSubmit);
+    receiptForm.addEventListener('submit', handleSaveSubmit);
+    document.getElementById('cancelButton').addEventListener('click', resetToUploadView);
+    document.getElementById('downloadCsvButton').addEventListener('click', downloadCsv);
+    document.getElementById('add-detail-btn').addEventListener('click', () => addDetailRow());
+
+    filterButton.addEventListener('click', fetchHistory);
+    clearFilterButton.addEventListener('click', () => {
+        filterStartDate.value = '';
+        filterEndDate.value = '';
+        filterStoreName.value = '';
+        fetchHistory();
+    });
+
+    // --- Event Delegation for Detail Rows ---
+    detailsContainer.addEventListener('input', (e) => {
+      const detailRow = e.target.closest('.detail-row');
+      if (!detailRow) return;
+
+      if (e.target.classList.contains('detail-amount')) {
+        recalculateTotal();
+      }
+
+      if (e.target.classList.contains('detail-amount') || e.target.classList.contains('detail-tax-rate')) {
+        calculateDetailAmounts(detailRow);
+      }
+      
+      if (e.target.classList.contains('detail-amount') || e.target.classList.contains('detail-participants')) {
+        updateDetailCategory(detailRow);
+      }
+    });
+    
+    detailsContainer.addEventListener('change', (e) => {
+        const detailRow = e.target.closest('.detail-row');
+        if (!detailRow) return;
+
+        if (e.target.classList.contains('detail-category')) {
+            validateDetailParticipants(detailRow);
+        }
+    });
+
+
+    // --- Main Functions ---
+    function handleUploadSubmit(event) {
+      event.preventDefault();
+      const file = fileInput.files[0];
+      if (!file) {
+        showAlert('ファイルを選択してください。', 'danger');
+        return;
+      }
+      setLoading(true);
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        localPreviewUrl = reader.result;
+
+        const fileData = reader.result.split(',')[1];
+        const formObject = {
+          fileName: file.name,
+          mimeType: file.type,
+          fileData: fileData
+        };
+        google.script.run
+          .withSuccessHandler(onUploadSuccess)
+          .withFailureHandler(onFailure)
+          .startUploadAndProcess(formObject);
+      };
+      reader.onerror = error => onFailure(error);
+    }
+
+    function onUploadSuccess(response) {
+        setLoading(false);
+        try {
+            if (response && response.status === 'success' && response.data) {
+                multiReceiptQueue = response.data;
+                showNextReceiptInQueue();
+            } else {
+                const message = (response && response.message) ? response.message : 'サーバーから予期しない応答がありました。';
+                showAlert(message, 'danger');
+            }
+        } catch (e) {
+            setLoading(false);
+            showAlert('結果の表示中にエラーが発生しました: ' + e.message, 'danger');
+            console.error('onUploadSuccess error:', e, e.stack);
+        }
+    }
+
+    function handleSaveSubmit(event) {
+        event.preventDefault();
+        saveButton.disabled = true;
+
+        const parentData = {
+            '登録ID': document.getElementById('receiptId').value,
+            useDate: document.getElementById('useDate').value,
+            user: document.getElementById('user').value,
+            storeName: document.getElementById('storeName').value,
+            memo: document.getElementById('memo').value,
+        };
+        
+        const detailsData = [];
+        const detailRows = detailsContainer.querySelectorAll('.detail-row');
+        let isValid = true;
+        detailRows.forEach(row => {
+            if (!row.querySelector('.detail-category').value) {
+                showAlert('すべての明細で勘定科目を選択してください。', 'warning');
+                isValid = false;
+            }
+            if (!row.querySelector('.detail-amount').value) {
+                showAlert('すべての明細で金額を入力してください。', 'warning');
+                isValid = false;
+            }
+
+            detailsData.push({
+                category: row.querySelector('.detail-category').value,
+                item: row.querySelector('.detail-item').value,
+                totalAmount: row.querySelector('.detail-amount').value,
+                client: row.querySelector('.detail-client').value,
+                participants: row.querySelector('.detail-participants').value,
+                subtotal: row.querySelector('.detail-subtotal').value,
+                tax: row.querySelector('.detail-tax').value,
+                memo: row.querySelector('.detail-memo').value
+            });
+        });
+
+        if (!isValid) {
+            saveButton.disabled = false;
+            return;
+        }
+
+        if (detailsData.length === 0) {
+            showAlert('明細を1件以上入力してください。', 'warning');
+            saveButton.disabled = false;
+            return;
+        }
+
+        google.script.run
+            .withSuccessHandler(onSaveSuccess)
+            .withFailureHandler(onFailure)
+            .updateFinalReceiptRow({ parentData, detailsData });
+    }
+    
+    function onSaveSuccess(response) {
+        saveButton.disabled = false;
+        if (response.status === 'success') {
+            showAlert('登録が完了しました。', 'success');
+            if (multiReceiptQueue.length > 0) {
+                showNextReceiptInQueue();
+            } else {
+                resetToUploadView();
+                fetchHistory();
+                historyTab.show();
+            }
+        } else {
+            showAlert(response.message, 'danger');
+        }
+    }
+
+    function fetchHistory() {
+        historyTableBody.innerHTML = '<tr><td colspan="5" class="text-center">履歴を読み込み中...</td></tr>';
+        const startDate = filterStartDate.value;
+        const endDate = filterEndDate.value;
+        const storeName = filterStoreName.value;
+        google.script.run
+            .withSuccessHandler(onGetHistorySuccess)
+            .withFailureHandler(onFailure)
+            .getReceipts(startDate, endDate, storeName);
+    }
+
+    function onGetHistorySuccess(receipts) {
+        if (receipts && receipts.length > 0) {
+            let tableRows = '';
+            receipts.forEach(item => {
+                tableRows += `
+                    <tr>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary mb-1" onclick="editReceipt('${item.receiptId}')">編集</button>
+                            ${item.fileId ? `<button type="button" class="btn btn-sm btn-outline-info" onclick="window.open('https://drive.google.com/file/d/${item.fileId}/view', '_blank')">登録画像</button>` : ''}
+                        </td>
+                        <td>${item.useDate || ''}</td>
+                        <td>${item.user || ''}</td>
+                        <td>${item.storeName || ''}</td>
+                        <td>${item.totalAmount ? item.totalAmount.toLocaleString() + '円' : ''}</td>
+                    </tr>
+                `;
+            });
+            historyTableBody.innerHTML = tableRows;
+        } else {
+            historyTableBody.innerHTML = '<tr><td colspan="5" class="text-center">登録履歴はありません。</td></tr>';
+        }
+    }
+
+    function editReceipt(receiptId) {
+      google.script.run
+        .withSuccessHandler(response => {
+          if(response.status === 'success') {
+            showEditSection(response.data, false);
+            const uploadTab = new bootstrap.Tab(document.getElementById('upload-tab'));
+            uploadTab.show();
+          } else {
+            showAlert(response.message, 'danger');
+          }
+        })
+        .withFailureHandler(onFailure)
+        .getReceiptDetails(receiptId);
+    }
+
+    // --- UI Control ---
+    function showNextReceiptInQueue() {
+        if (multiReceiptQueue.length === 0) {
+            showAlert('全ての領収書の処理が完了しました。', 'info');
+            resetToUploadView();
+            fetchHistory();
+            historyTab.show();
+            return;
+        }
+        const nextReceipt = multiReceiptQueue.shift();
+        showEditSection(nextReceipt, true);
+
+        const counter = document.getElementById('receipt-counter');
+        const total = multiReceiptQueue.length + 1;
+        if (total > 1) {
+            counter.textContent = `${total - multiReceiptQueue.length} / ${total} 件目`;
+            counter.style.display = 'block';
+            saveButton.textContent = '登録して次へ';
+        }
+    }
+
+    function showEditSection(data, isNewUpload) {
+        const { parentData, detailsData } = data;
+
+        receiptForm.reset();
+        
+        document.getElementById('receiptId').value = parentData['登録ID'] || '';
+        document.getElementById('useDate').value = parentData.useDate || new Date().toISOString().slice(0, 10);
+        document.getElementById('user').value = parentData.user || '';
+        document.getElementById('storeName').value = parentData.storeName || '';
+        document.getElementById('totalAmount').value = parentData.totalAmount || '0';
+        document.getElementById('memo').value = parentData.memo || '';
+        
+        const previewContainer = document.getElementById('file-preview-container');
+        if (isNewUpload) {
+            if (localPreviewUrl && parentData.mimeType) {
+                if (parentData.mimeType.startsWith('image/')) {
+                    previewContainer.innerHTML = `<img src="${localPreviewUrl}" alt="領収書プレビュー">`;
+                } else if (parentData.mimeType === 'application/pdf') {
+                    previewContainer.innerHTML = `<iframe src="${localPreviewUrl}"></iframe>`;
+                }
+            }
+        } else if (parentData.fileId && parentData.mimeType) {
+            if(parentData.mimeType.startsWith('image/')) {
+                previewContainer.innerHTML = `<img src="https://docs.google.com/uc?export=view&id=${parentData.fileId}" alt="領収書プレビュー">`;
+            } else if (parentData.mimeType === 'application/pdf') {
+                previewContainer.innerHTML = `<iframe src="https://drive.google.com/file/d/${parentData.fileId}/preview"></iframe>`;
+            }
+        } else {
+            previewContainer.innerHTML = '<span class="text-muted">プレビューするファイルがありません。</span>';
+        }
+        
+        detailsContainer.innerHTML = '';
+        if (detailsData && detailsData.length > 0) {
+            detailsData.forEach(addDetailRow);
+        } else {
+            addDetailRow({totalAmount: parentData.totalAmount});
+        }
+        recalculateTotal();
+
+        uploadSection.style.display = 'none';
+        editSection.style.display = 'block';
+    }
+
+    function addDetailRow(detail = {}) {
+        const div = document.createElement('div');
+        div.className = 'row g-3 p-3 mb-3 detail-row rounded';
+        div.innerHTML = `
+            <div class="col-12">
+                <div class="d-flex justify-content-between">
+                    <label class="form-label">勘定科目</label>
+                    <button type="button" class="btn-close" aria-label="削除"></button>
+                </div>
+                <select class="form-select detail-category" required>${categoryOptions}</select>
+            </div>
+            <div class="col-12">
+                <label class="form-label">品目</label>
+                <input type="text" class="form-control detail-item">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">取引先</label>
+                <input type="text" class="form-control detail-client">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">参加人数</label>
+                <input type="text" class="form-control detail-participants">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">金額（税込）</label>
+                <input type="number" class="form-control amount-input detail-amount" placeholder="0" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">消費税率</label>
+                <select class="form-select detail-tax-rate">
+                    <option value="0.1" selected>10%</option>
+                    <option value="0.08">8%</option>
+                    <option value="0">免税</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">税抜合計</label>
+                <input type="number" class="form-control amount-input detail-subtotal" placeholder="0" readonly>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">消費税</label>
+                <input type="number" class="form-control amount-input detail-tax" placeholder="0" readonly>
+            </div>
+            <div class="col-12">
+                <label class="form-label">メモ（明細）</label>
+                <textarea class="form-control detail-memo" rows="1"></textarea>
+            </div>
+            
+        `;
+        div.querySelector('.btn-close').addEventListener('click', () => {
+            div.remove();
+            recalculateTotal();
+        });
+
+        div.querySelector('.detail-category').value = detail.category || '';
+        div.querySelector('.detail-item').value = detail.item || '';
+        div.querySelector('.detail-client').value = detail.client || '';
+        div.querySelector('.detail-participants').value = detail.participants || '';
+        div.querySelector('.detail-amount').value = detail.totalAmount || '';
+        div.querySelector('.detail-memo').value = detail.memo || '';
+        
+        detailsContainer.appendChild(div);
+
+        calculateDetailAmounts(div);
+        updateDetailCategory(div);
+        validateDetailParticipants(div);
+    }
+
+    function calculateDetailAmounts(detailRow) {
+      const totalInput = detailRow.querySelector('.detail-amount');
+      const rateSelect = detailRow.querySelector('.detail-tax-rate');
+      const subtotalInput = detailRow.querySelector('.detail-subtotal');
+      const taxInput = detailRow.querySelector('.detail-tax');
+
+      const total = parseFloat(totalInput.value) || 0;
+      const rate = parseFloat(rateSelect.value);
+
+      if (total > 0 && isFinite(rate)) {
+          const subtotal = Math.round(total / (1 + rate));
+          const tax = total - subtotal;
+          subtotalInput.value = subtotal;
+          taxInput.value = tax;
+      } else {
+          subtotalInput.value = '';
+          taxInput.value = '';
+      }
+    }
+
+    function updateDetailCategory(detailRow) {
+        const totalAmount = parseFloat(detailRow.querySelector('.detail-amount').value) || 0;
+        const participantsValue = detailRow.querySelector('.detail-participants').value.trim();
+        const categorySelect = detailRow.querySelector('.detail-category');
+        
+        const currentCategory = categorySelect.value;
+        const isEntertainmentRelated = ['接待交際費', '少額接待交際費', '会議費', ''].includes(currentCategory);
+
+        if (totalAmount <= 0 || participantsValue === '' || !isEntertainmentRelated) return;
+        
+        if (participantsValue.includes('割勘')) {
+            categorySelect.value = '接待交際費';
+            return;
+        }
+
+        const numberOfParticipants = parseInt(participantsValue, 10);
+        if (!isNaN(numberOfParticipants) && numberOfParticipants > 0) {
+            const amountPerPerson = totalAmount / numberOfParticipants;
+            if (amountPerPerson > 10000) { 
+                categorySelect.value = '接待交際費';
+            } else {
+                categorySelect.value = '少額接待交際費';
+            }
+        }
+        validateDetailParticipants(detailRow);
+    }
+
+    function validateDetailParticipants(detailRow) {
+        const categorySelect = detailRow.querySelector('.detail-category');
+        const participantsInput = detailRow.querySelector('.detail-participants');
+        const participantsValue = participantsInput.value.trim();
+        const entertainmentCategories = ['接待交際費', '少額接待交際費', '会議費'];
+        const isEntertainment = entertainmentCategories.includes(categorySelect.value);
+
+        const existingFeedback = participantsInput.closest('.col-md-6').querySelector('.invalid-feedback');
+        if (existingFeedback) existingFeedback.remove();
+        participantsInput.classList.remove('is-invalid');
+
+        if (!isEntertainment) return;
+
+        const isNumeric = participantsValue !== '' && isFinite(Number(participantsValue));
+        const isWarikan = participantsValue.includes('割勘');
+
+        if (!participantsValue || (!isNumeric && !isWarikan)) {
+            participantsInput.classList.add('is-invalid');
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'invalid-feedback d-block';
+            feedbackDiv.textContent = '参加人数の入力が必要です。';
+            participantsInput.parentNode.appendChild(feedbackDiv);
+        }
+    }
+
+    function recalculateTotal() {
+        let total = 0;
+        const amounts = detailsContainer.querySelectorAll('.detail-amount');
+        amounts.forEach(input => {
+            total += Number(input.value) || 0;
+        });
+        document.getElementById('totalAmount').value = total;
+    }
+
+    function resetToUploadView() {
+        uploadForm.reset();
+        receiptForm.reset();
+        detailsContainer.innerHTML = '';
+        editSection.style.display = 'none';
+        uploadSection.style.display = 'block';
+        localPreviewUrl = null;
+        multiReceiptQueue = [];
+        document.getElementById('receipt-counter').style.display = 'none';
+        saveButton.textContent = '登録';
+    }
+
+    function populateUserDropdown(users) {
+        const select = document.getElementById('user');
+        let options = '<option value="">選択してください</option>';
+        users.forEach(user => {
+            options += `<option value="${user}">${user}</option>`;
+        });
+        select.innerHTML = options;
+        userOptions = options;
+    }
+
+    function populateCategoryDropdown(categories) {
+        let options = '<option value="">選択してください</option>';
+        categories.forEach(cat => {
+            options += `<option value="${cat}">${cat}</option>`;
+        });
+        categoryOptions = options;
+    }
+    
+    function downloadCsv() {
+        const button = document.getElementById('downloadCsvButton');
+        button.disabled = true;
+        button.textContent = '作成中...';
+
+        const startDate = filterStartDate.value;
+        const endDate = filterEndDate.value;
+        const storeName = filterStoreName.value;
+
+        google.script.run
+            .withSuccessHandler(csvData => {
+                if (typeof csvData !== 'string' || csvData.startsWith("エラー:") || csvData === "データがありません") {
+                    showAlert(csvData || 'CSVデータの生成に失敗しました。', 'warning');
+                } else {
+                    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                    const blob = new Blob([bom, csvData], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement("a");
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute("href", url);
+                    const fileName = `領収書履歴_${new Date().toISOString().slice(0,10)}.csv`;
+                    link.setAttribute("download", fileName);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showAlert('CSVファイルのダウンロードを開始しました。', 'success');
+                }
+                button.disabled = false;
+                button.textContent = 'CSVダウンロード';
+            })
+            .withFailureHandler(err => {
+                onFailure(err);
+                button.disabled = false;
+                button.textContent = 'CSVダウンロード';
+            })
+            .getReceiptsAsCsv(startDate, endDate, storeName);
+    }
+
+    function onFailure(error) {
+        setLoading(false);
+        saveButton.disabled = false;
+        const errorMessage = (error && error.message) ? error.message : String(error);
+        showAlert('エラーが発生しました: ' + errorMessage, 'danger');
+        console.error("A server-side error occurred:", error);
+    }
+
+    // --- Utilities ---
+    function setLoading(isLoading) {
+      submitButton.disabled = isLoading;
+      spinner.style.display = isLoading ? 'inline-block' : 'none';
+    }
+
+    function showAlert(message, type = 'info') {
+      const alertContainer = document.getElementById('alert-container');
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+      alertDiv.role = 'alert';
+      alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      `;
+      alertContainer.appendChild(alertDiv);
+      setTimeout(() => {
+        const bsAlert = new bootstrap.Alert(alertDiv);
+        bsAlert.close();
+      }, 5000);
+    }
+    
+  </script>
+</body>
+</html>
+
